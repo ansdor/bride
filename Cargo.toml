@@ -1,0 +1,17 @@
+[package]
+name = "bride"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sandro Luiz de Paula <me@ansdor.com>"]
+
+[dependencies]
+egui = "0.25"
+egui_extras = { version = "0.25", features = [ "image" ] }
+eframe = { version = "0.25", default-features = false, features = [
+	   "default_fonts",		 
+	   "glow",
+	   ] }
+image = { version = "0.24", features = [ "png", "jpeg" ] }
+base64 = "0.21"
+rustyline = "13"
+nofmt = "1"

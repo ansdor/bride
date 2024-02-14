@@ -1,0 +1,7 @@
+edition = "2021"
+brace_style = "PreferSameLine"
+control_brace_style = "AlwaysSameLine"
+fn_single_line = true
+fn_params_layout = "Compressed"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
