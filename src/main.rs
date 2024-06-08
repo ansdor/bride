@@ -13,6 +13,7 @@ mod utils;
 const DEFAULT_PORT: u16 = 33760;
 const PROGRAM_NAME: &str = env!("CARGO_PKG_NAME");
 const PROGRAM_VERSION: &str = env!("CARGO_PKG_VERSION");
+const WINDOW_SIZE: (f32, f32) = (1280.0, 720.0);
 
 fn main() -> eframe::Result<()> {
     let (shell, port) = parse_command_line_args(env::args().collect());
@@ -26,7 +27,7 @@ fn main() -> eframe::Result<()> {
         let options = eframe::NativeOptions {
             viewport: ViewportBuilder::default()
                 .with_title(format!("{} [v{}]", PROGRAM_NAME, PROGRAM_VERSION))
-                .with_inner_size([1280.0, 720.0])
+                .with_inner_size([WINDOW_SIZE.0, WINDOW_SIZE.1])
                 .with_resizable(true),
             ..Default::default()
         };

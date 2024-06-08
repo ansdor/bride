@@ -206,11 +206,11 @@ impl eframe::App for Screen {
             eprintln!("{msg}");
         }
         const LEFT_SIDE_PANELS: usize = 4;
-        let (rw, rh) = (1280.0, 720.0);
-        let (sw, sh) = (ctx.screen_rect().width(), ctx.screen_rect().height());
+        let current_scale = ctx.zoom_factor();
+        let (rw, rh) = crate::WINDOW_SIZE;
+        let (sw, sh) = (ctx.screen_rect().width() * current_scale, ctx.screen_rect().height() * current_scale);
         let interface_scale = (sw / rw).min(sh / rh);
-        let original_scale = ctx.pixels_per_point();
-        ctx.set_pixels_per_point(original_scale * interface_scale);
+        ctx.set_zoom_factor(interface_scale);
         egui::Window::new("bride")
             .frame(egui::Frame::none().fill(egui::Color32::from_hex("#111218").unwrap()))
             .resizable(false)
@@ -229,9 +229,9 @@ impl eframe::App for Screen {
                 ui.spacing_mut().item_spacing = egui::Vec2::from([0.0, 0.0]);
                 ui.set_width(ctx.screen_rect().width());
                 ui.set_height(ctx.screen_rect().height());
-                ui.add_space(ui.available_height() / 2.0 - rh * interface_scale / 2.0);
+                ui.add_space(ui.available_height() / 2.0 - rh / 2.0);
                 ui.horizontal(|ui| {
-                    ui.add_space(ui.available_width() / 2.0 - rw * interface_scale / 2.0);
+                    ui.add_space(ui.available_width() / 2.0 - rw / 2.0);
                     ui.vertical(|ui| {
                         self.panels.iter_mut().take(LEFT_SIDE_PANELS).for_each(|x| {
                             x.render(ctx, ui);
