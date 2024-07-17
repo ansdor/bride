@@ -20,6 +20,7 @@ mod panels;
 
 pub struct Screen {
     enabled: bool,
+    resize_frame_skip: bool,
     queue: CommandQueue,
     state_reset: HashSet<&'static str>,
     panels: Vec<Box<dyn Panel>>,
@@ -101,6 +102,7 @@ impl Screen {
             panels: Vec::new(),
             state_reset: HashSet::new(),
             enabled: false,
+            resize_frame_skip: false,
             console: None,
             port,
         }
@@ -208,9 +210,18 @@ impl eframe::App for Screen {
         const LEFT_SIDE_PANELS: usize = 4;
         let current_scale = ctx.zoom_factor();
         let (rw, rh) = crate::WINDOW_SIZE;
-        let (sw, sh) = (ctx.screen_rect().width() * current_scale, ctx.screen_rect().height() * current_scale);
+        let (sw, sh) = (
+            ctx.screen_rect().width() * current_scale,
+            ctx.screen_rect().height() * current_scale,
+        );
         let interface_scale = (sw / rw).min(sh / rh);
-        ctx.set_zoom_factor(interface_scale);
+        if self.resize_frame_skip {
+            //this fixes a bug that sometimes happens when rescaling the window
+            self.resize_frame_skip = false;
+        } else {
+            ctx.set_zoom_factor(interface_scale);
+            self.resize_frame_skip = true;
+        }
         egui::Window::new("bride")
             .frame(egui::Frame::none().fill(egui::Color32::from_hex("#111218").unwrap()))
             .resizable(false)
