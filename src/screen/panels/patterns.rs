@@ -250,7 +250,7 @@ impl screen::StateSync for PatternsPanel {
     }
 
     fn write_state(&mut self, send: &mut dyn FnMut(&str)) {
-        if self.monitor.time_elapsed(Duration::from_millis(80)) {
+        if self.monitor.time_elapsed(Duration::from_millis(120)) {
             let section = self.state.section;
             let pattern = self.state.index;
             let (mut setter, mut sliders) = (false, false);
@@ -352,7 +352,7 @@ impl screen::Render for PatternsPanel {
                         .width(combo_width)
                         .show_ui(ui, |ui| {
                             for (i, p) in self.pattern_cache.iter().enumerate() {
-                                if ui.add(Label::new(RT::new(&p.1).size(14.0)).sense(Sense::click())).clicked() {
+                                if ui.add(Label::new(RT::new(&p.1).size(14.0)).truncate(true).sense(Sense::click())).clicked() {
                                     self.state.index = i;
                                     self.modified.flag(Fields::Select);
                                 }
@@ -370,7 +370,7 @@ impl screen::Render for PatternsPanel {
                         .width(combo_width)
                         .show_ui(ui, |ui| {
                             for (i, p) in self.prop_cache.iter().enumerate() {
-                                if ui.add(Label::new(RT::new(p).size(14.0)).sense(Sense::click())).clicked() {
+                                if ui.add(Label::new(RT::new(p).size(14.0)).truncate(true).sense(Sense::click())).clicked() {
                                     self.state.prop = i;
                                     self.modified.flag(Fields::Edit);
                                 }

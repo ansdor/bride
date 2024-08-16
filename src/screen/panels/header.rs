@@ -133,7 +133,7 @@ impl screen::StateSync for HeaderPanel {
     fn write_state(&mut self, send: &mut dyn FnMut(&str)) {
         let mut extras = false;
         let mut play_test = false;
-        if self.monitor.time_elapsed(Duration::from_millis(48)) {
+        if self.monitor.time_elapsed(Duration::from_millis(500)) {
             let mut request = false;
             for field in self.modified.drain() {
                 request = true;
