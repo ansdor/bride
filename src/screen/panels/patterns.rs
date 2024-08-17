@@ -3,7 +3,7 @@ use std::{collections::HashSet, sync::mpsc::Receiver, time::Duration};
 use super::{FieldFlags, StateMonitor};
 use crate::{screen, server, utils};
 
-static CHECKBOXES: [&str; 4] = ["Mirror", "Flip", "Sine", "Random Flip"];
+static CHECKBOXES: [&str; 5] = ["Mirror", "Flip", "Sine", "Random Flip", "Sync Offset"];
 const X_SCALAR: i32 = 10;
 
 #[derive(PartialEq, Eq, Hash)]
