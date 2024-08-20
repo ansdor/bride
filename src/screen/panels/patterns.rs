@@ -385,7 +385,7 @@ impl screen::Render for PatternsPanel {
                     nofmt::pls! {
                         sliders |= Self::precision_slider("Position", slider_size, &mut self.state.position, 0..=self.current_section_length, no_format, ui);
                         sliders |= Self::precision_slider("Size", slider_size, &mut self.state.size, 0..=500, no_format, ui);
-                        sliders |= Self::precision_slider("Spacing", slider_size, &mut self.state.spacing, 0..=50, no_format, ui);
+                        sliders |= Self::precision_slider("Spacing", slider_size, &mut self.state.spacing, 1..=50, no_format, ui);
                         sliders |= Self::precision_slider("X", slider_size, &mut self.state.x, -1000..=1000, Some(|x| format!("{}", x * X_SCALAR)), ui);
                         sliders |= Self::precision_slider("Frequency", slider_size, &mut self.state.freq, 1..=255, no_format, ui);
                         sliders |= Self::precision_slider("Amplitude", slider_size, &mut self.state.amp, 0..=500, Some(|x| format!("{}", x * X_SCALAR)), ui);
