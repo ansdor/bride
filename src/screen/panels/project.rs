@@ -80,7 +80,7 @@ impl screen::CommandHandler for ProjectPanel {
     fn should_handle(&self, command: &str) -> bool { self.commands.contains(command) }
 
     fn handle(&mut self, response: &server::Response) -> utils::UnitResult {
-        const EMPTY_SIGNAL: &str = "<EMPTY>";
+        use super::EMPTY_SIGNAL;
         let (err, cmd, args, resp) = response.decompose();
         if cmd == "project-list" {
             self.project_cache.clear();

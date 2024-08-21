@@ -56,11 +56,9 @@ pub trait Render {
             ui.spacing_mut().item_spacing = Vec2::from([4.0, 2.0]);
             let mut r = false;
             ui.add_sized([size[0] * 0.15, size[1]], Label::new(label));
-            if ui.button("-").clicked() {
-                if *state > min {
-                    *state -= 1;
-                    r = true;
-                }
+            if ui.button("-").clicked() && *state > min {
+                *state -= 1;
+                r = true;
             }
             let prev_slider_size = ui.spacing().slider_width;
             ui.spacing_mut().slider_width = size[0] * 0.90;
@@ -72,11 +70,9 @@ pub trait Render {
                 r = true;
             }
             ui.spacing_mut().slider_width = prev_slider_size;
-            if ui.button("+").clicked() {
-                if *state < max {
-                    *state += 1;
-                    r = true;
-                }
+            if ui.button("+").clicked() && *state < max {
+                *state += 1;
+                r = true;
             }
             ui.add_sized(
                 [size[0] * 0.10, size[1]],

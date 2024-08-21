@@ -26,7 +26,7 @@ pub struct SectionsPanel {
     view_sender: Sender<(i32, i32)>,
     metrics: String,
     scroll_to: Option<usize>,
-    last_move: Option<usize>,
+    last_move: Option<isize>,
 }
 
 #[derive(Default, Hash)]
@@ -141,7 +141,7 @@ impl screen::CommandHandler for SectionsPanel {
             if cmd == "section-add" {
                 self.scroll_to.replace(self.cache.len());
             } else if cmd == "section-list" {
-                const EMPTY_SIGNAL: &str = "<EMPTY>";
+                use super::EMPTY_SIGNAL;
                 self.cache.clear();
                 if !resp.starts_with(EMPTY_SIGNAL) {
                     resp.lines()
@@ -180,7 +180,7 @@ impl screen::CommandHandler for SectionsPanel {
                 self.scroll_to.replace(self.state.selected + 1);
             } else if cmd == "section-move" {
                 if let Some(d) = self.last_move.take() {
-                    self.scroll_to.replace(self.state.selected + d);
+                    self.scroll_to.replace(self.state.selected.saturating_add_signed(d));
                 }
             }
         }
@@ -226,8 +226,14 @@ impl screen::StateSync for SectionsPanel {
                     Fields::Add => send("section-add"),
                     Fields::Delete => send(&format!("section-delete {}", s)),
                     Fields::Duplicate => send(&format!("section-duplicate {}", s)),
-                    Fields::MoveUp => send(&format!("section-move {} -1", s)),
-                    Fields::MoveDown => send(&format!("section-move {} 1", s)),
+                    Fields::MoveUp => {
+                        send(&format!("section-move {} -1", s));
+                        let _ = self.last_move.replace(-1);
+                    }
+                    Fields::MoveDown => {
+                        send(&format!("section-move {} 1", s));
+                        let _ = self.last_move.replace(1);
+                    }
                     Fields::Edit => {
                         let s = &self.state;
                         send(&format!(

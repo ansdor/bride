@@ -34,10 +34,7 @@ impl Response {
             Self::Error(c, r) => (&c[..], &r[..]),
             Self::Nothing => ("", ""),
         };
-        match c.split_once(char::is_whitespace) {
-            Some((_, args)) => args,
-            None => "",
-        }
+        c.split_once(char::is_whitespace).unwrap_or_default().1
     }
 
     pub fn result(&self) -> &str {

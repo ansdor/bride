@@ -179,7 +179,7 @@ impl screen::CommandHandler for PatternsPanel {
     fn should_handle(&self, command: &str) -> bool { self.commands.contains(command) }
 
     fn handle(&mut self, response: &server::Response) -> utils::UnitResult {
-        const EMPTY_SIGNAL: &str = "<EMPTY>";
+        use super::EMPTY_SIGNAL;
         let (err, cmd, _, resp) = response.decompose();
         if cmd == "package-props" {
             self.prop_cache.clear();
@@ -383,8 +383,8 @@ impl screen::Render for PatternsPanel {
                     let no_format = Option::<fn(i32) -> String>::None;
                     let mut sliders = false;
                     nofmt::pls! {
-                        sliders |= Self::precision_slider("Position", slider_size, &mut self.state.position, 0..=self.current_section_length, no_format, ui);
-                        sliders |= Self::precision_slider("Size", slider_size, &mut self.state.size, 0..=500, no_format, ui);
+                        sliders |= Self::precision_slider("Position", slider_size, &mut self.state.position, 0..=(self.current_section_length-1), no_format, ui);
+                        sliders |= Self::precision_slider("Size", slider_size, &mut self.state.size, 1..=500, no_format, ui);
                         sliders |= Self::precision_slider("Spacing", slider_size, &mut self.state.spacing, 1..=50, no_format, ui);
                         sliders |= Self::precision_slider("X", slider_size, &mut self.state.x, -1000..=1000, Some(|x| format!("{}", x * X_SCALAR)), ui);
                         sliders |= Self::precision_slider("Frequency", slider_size, &mut self.state.freq, 1..=255, no_format, ui);

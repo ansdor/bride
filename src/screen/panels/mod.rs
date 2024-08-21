@@ -21,6 +21,8 @@ pub use sections::SectionsPanel;
 pub use patterns::PatternsPanel;
 pub use project::ProjectPanel;
 
+const EMPTY_SIGNAL: &str = "<EMPTY>";
+
 struct FieldFlags<T> {
     flagged: HashSet<T>,
 }
