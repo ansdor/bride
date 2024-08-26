@@ -139,7 +139,7 @@ impl screen::CommandHandler for SectionsPanel {
         let (err, cmd, _, resp) = response.decompose();
         if !err {
             if cmd == "section-add" {
-                self.scroll_to.replace(self.cache.len());
+                self.scroll_to.replace(self.state.selected + 1);
             } else if cmd == "section-list" {
                 use super::EMPTY_SIGNAL;
                 self.cache.clear();
@@ -223,7 +223,7 @@ impl screen::StateSync for SectionsPanel {
                 request = true;
                 match field {
                     Fields::Select => sliders = true,
-                    Fields::Add => send("section-add"),
+                    Fields::Add => send(&format!("section-add {}", s + 1)),
                     Fields::Delete => send(&format!("section-delete {}", s)),
                     Fields::Duplicate => send(&format!("section-duplicate {}", s)),
                     Fields::MoveUp => {
