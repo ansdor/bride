@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet, sync::mpsc::Receiver, time::Duration};
+use std::{borrow::Cow, collections::HashSet, time::Duration};
 
 use base64::Engine;
 
@@ -8,6 +8,7 @@ use crate::{screen, server, utils};
 const IDLE_PREVIEW_TIME: u64 = 480;
 const CHANGE_PREVIEW_TIME: u64 = 80;
 const PREVIEW_SIZE: [f32; 2] = [640.0, 360.0];
+const SLIDER_SCALE: i32 = 10;
 
 #[derive(PartialEq, Eq, Hash)]
 enum Fields {
@@ -22,7 +23,6 @@ pub struct PreviewPanel {
     image_data: Option<Vec<u8>>,
     monitor: StateMonitor<PreviewPanelState>,
     modified: FieldFlags<Fields>,
-    receiver: Receiver<(i32, i32)>,
 }
 
 #[derive(Default, Hash)]
@@ -34,14 +34,13 @@ struct PreviewPanelState {
 }
 
 impl PreviewPanel {
-    pub fn new(receiver: Receiver<(i32, i32)>) -> Self {
+    pub fn new() -> Self {
         PreviewPanel {
             state: PreviewPanelState::default(),
             commands: HashSet::new(),
             image_data: None,
             monitor: StateMonitor::new(),
             modified: FieldFlags::new(),
-            receiver,
         }
     }
 }
@@ -52,11 +51,21 @@ impl screen::CommandHandler for PreviewPanel {
     fn should_handle(&self, command: &str) -> bool { self.commands.contains(command) }
 
     fn handle(&mut self, contents: &server::Response) -> utils::UnitResult {
-        let (err, cmd, _, resp) = contents.decompose();
-        if !err && cmd == "view-preview" && self.image_data.is_none() {
-            let mut image_data = Vec::with_capacity(8192);
-            base64::engine::general_purpose::STANDARD.decode_vec(resp, &mut image_data)?;
-            self.image_data.replace(image_data);
+        let (err, cmd, args, resp) = contents.decompose();
+        if !err {
+            if cmd == "view-position" {
+                if let Some(coords) = args.split_once(' ') {
+                    let (x, z) = (coords.0.parse::<i32>(), coords.1.parse::<i32>());
+                    if let (Ok(x), Ok(z)) = (x, z) {
+                        self.state.view_x = x / 10;
+                        self.state.view_z = z / 10;
+                    }
+                }
+            } else if cmd == "view-preview" && self.image_data.is_none() {
+                let mut image_data = Vec::with_capacity(8192);
+                base64::engine::general_purpose::STANDARD.decode_vec(resp, &mut image_data)?;
+                self.image_data.replace(image_data);
+            }
         }
         Ok(())
     }
@@ -74,13 +83,6 @@ impl screen::StateSync for PreviewPanel {
 
     fn update_state(&mut self) {
         self.monitor.update(&self.state);
-        if let Ok((x, z)) = self.receiver.try_recv() {
-            if x != self.state.view_x || z != self.state.view_z {
-                self.state.view_x = x / 10;
-                self.state.view_z = z / 10;
-                self.modified.flag(Fields::View);
-            }
-        }
     }
 
     fn request_state(&self, send: &mut dyn FnMut(&str)) { send("view-preview"); }
@@ -96,8 +98,8 @@ impl screen::StateSync for PreviewPanel {
                         Fields::View => {
                             format!(
                                 "view-position {} {}",
-                                self.state.view_x * 10,
-                                self.state.view_z * 10
+                                self.state.view_x * SLIDER_SCALE,
+                                self.state.view_z * SLIDER_SCALE
                             )
                         }
                         Fields::Reverse => {
@@ -137,7 +139,7 @@ impl screen::Render for PreviewPanel {
             );
 
             const SLIDER_SIZE: [f32; 2] = [512.0, 16.0];
-            let formatter = |n| format!("{}", n * 10);
+            let formatter = |n| format!("{}", n * SLIDER_SCALE);
 
             ui.add_space(4.0);
             ui.horizontal(|ui| {

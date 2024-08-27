@@ -127,15 +127,13 @@ impl Screen {
         let (t0, r0) = mpsc::channel::<(usize, i32)>();
         //channel used to send messages to the console window
         let (t1, r1) = mpsc::channel::<String>();
-        //channel used to send data from sections to view
-        let (t2, r2) = mpsc::channel::<(i32, i32)>();
         self.panels = vec![
             Box::new(ProjectPanel::new()),
             Box::new(HeaderPanel::new()),
-            Box::new(SectionsPanel::new(t0, t2)),
+            Box::new(SectionsPanel::new(t0)),
             Box::new(PatternsPanel::new(r0)),
             Box::new(ColorsPanel::new()),
-            Box::new(PreviewPanel::new(r2)),
+            Box::new(PreviewPanel::new()),
             Box::new(ConsolePanel::new(Some(r1))),
         ];
         //create the console channel

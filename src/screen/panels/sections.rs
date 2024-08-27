@@ -1,14 +1,26 @@
-use std::{collections::HashSet, sync::mpsc::Sender, time::Duration};
+use std::{
+    cmp, collections::HashSet, sync::{mpsc::Sender, LazyLock}, time::Duration
+};
 
 use super::{FieldFlags, StateMonitor};
 use crate::{screen, server, utils::UnitResult};
 
 const LENGTH_SCALAR: i32 = 25;
+static BUTTONS: LazyLock<Vec<(&'static str, Fields)>> = LazyLock::new(|| {
+    vec![
+        ("Add", Fields::Add),
+        ("Delete", Fields::Delete),
+        ("Duplicate", Fields::Duplicate),
+        ("Move Up", Fields::MoveUp),
+        ("Move Down", Fields::MoveDown),
+    ]
+});
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 enum Fields {
     Select,
     Edit,
+    View,
     Add,
     Delete,
     Duplicate,
@@ -23,8 +35,8 @@ pub struct SectionsPanel {
     monitor: StateMonitor<SectionsState>,
     modified: FieldFlags<Fields>,
     pattern_sender: Sender<(usize, i32)>,
-    view_sender: Sender<(i32, i32)>,
     metrics: String,
+    sync_view: bool,
     scroll_to: Option<usize>,
     last_move: Option<isize>,
 }
@@ -42,7 +54,7 @@ struct SectionsState {
 impl screen::Panel for SectionsPanel {}
 
 impl SectionsPanel {
-    pub fn new(pattern_sender: Sender<(usize, i32)>, view_sender: Sender<(i32, i32)>) -> Self {
+    pub fn new(pattern_sender: Sender<(usize, i32)>) -> Self {
         SectionsPanel {
             cache: Vec::new(),
             state: Default::default(),
@@ -50,7 +62,7 @@ impl SectionsPanel {
             monitor: StateMonitor::new(),
             modified: FieldFlags::new(),
             pattern_sender,
-            view_sender,
+            sync_view: true,
             metrics: String::from("-"),
             scroll_to: None,
             last_move: None,
@@ -136,7 +148,7 @@ impl screen::CommandHandler for SectionsPanel {
     fn should_handle(&self, command: &str) -> bool { self.commands.contains(command) }
 
     fn handle(&mut self, response: &server::Response) -> UnitResult {
-        let (err, cmd, _, resp) = response.decompose();
+        let (err, cmd, args, resp) = response.decompose();
         if !err {
             if cmd == "section-add" {
                 self.scroll_to.replace(self.state.selected + 1);
@@ -180,7 +192,29 @@ impl screen::CommandHandler for SectionsPanel {
                 self.scroll_to.replace(self.state.selected + 1);
             } else if cmd == "section-move" {
                 if let Some(d) = self.last_move.take() {
-                    self.scroll_to.replace(self.state.selected.saturating_add_signed(d));
+                    self.scroll_to
+                        .replace(self.state.selected.saturating_add_signed(d));
+                }
+            } else if cmd == "view-position" && self.sync_view {
+                if let Some(coords) = args.split_once(' ') {
+                    if let Ok(mut view_z) = coords.1.parse::<i32>() {
+                        let mut target_section = 0;
+                        for section in &self.cache {
+                            if let Some((len, _, _, _)) = Self::extract_section_data(&section.0) {
+                                if view_z - len <= 0 {
+                                    break;
+                                } else {
+                                    view_z -= len;
+                                    target_section += 1;
+                                }
+                            }
+                        }
+                        let next_selected = cmp::min(self.cache.len() - 1, target_section);
+                        if next_selected != self.state.selected {
+                            self.state.selected = next_selected;
+                            self.modified.flag(Fields::Select);
+                        }
+                    }
                 }
             }
         }
@@ -196,6 +230,7 @@ impl screen::StateSync for SectionsPanel {
             "section-metrics",
             "section-duplicate",
             "section-move",
+            "view-position",
         ]);
     }
 
@@ -233,6 +268,21 @@ impl screen::StateSync for SectionsPanel {
                     Fields::MoveDown => {
                         send(&format!("section-move {} 1", s));
                         let _ = self.last_move.replace(1);
+                    }
+                    Fields::View => {
+                        let view_z: i32 = self
+                            .cache
+                            .iter()
+                            .map(|x| {
+                                if let Some(d) = Self::extract_section_data(&x.0) {
+                                    d.0
+                                } else {
+                                    0
+                                }
+                            })
+                            .take(self.state.selected)
+                            .sum();
+                        send(&format!("view-position 0 {}", view_z));
                     }
                     Fields::Edit => {
                         let s = &self.state;
@@ -278,60 +328,44 @@ impl screen::Render for SectionsPanel {
                         } else {
                             &self.cache[self.state.selected].1
                         })
-                        .width(400.0)
+                        .width(380.0)
                         .show_ui(ui, |ui| {
                             if !self.cache.is_empty() {
                                 for (i, s) in self.cache.iter().enumerate() {
                                     if ui
                                         .add(
                                             Label::new(RT::new(&s.1).text_style(TextStyle::Monospace).size(12.0))
-                                                .sense(Sense::click()),
+                                                .truncate(true).sense(Sense::click()),
                                         )
                                         .clicked()
                                     {
                                         self.state.selected = i;
                                         self.modified.flag(Fields::Select);
+                                        if self.sync_view {
+                                            self.modified.flag(Fields::View);
+                                        }
                                     }
                                 }
                             }
                         });
                     ui.add_space(8.0);
                     if ui.button(RT::new("View").size(14.0)).clicked() {
-                        let view_z: i32 = self.cache.iter().map(|x| {
-                            if let Some(d) = Self::extract_section_data(&x.0) {
-                                d.0
-                            } else {
-                                0
-                            }
-                        }).take(self.state.selected).sum();
-                        if let Err(msg) = self.view_sender.send((0, view_z)) {
-                            eprintln!("{msg}");
-                        }
+                        self.modified.flag(Fields::View);
+                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
                     }
                 });
 
                 ui.horizontal(|ui| {
-                    ui.add_space(256.0);
+                    ui.add_space(32.0);
+                    ui.checkbox(&mut self.sync_view, "Synchronize Preview");
+                    ui.add_space(96.0);
                     ui.spacing_mut().item_spacing = Vec2::from([8.0, 4.0]);
-                    if ui.button(RT::new("Add").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Add);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Delete").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Delete);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Duplicate").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Duplicate);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Move Up").size(14.0)).clicked() {
-                        self.modified.flag(Fields::MoveUp);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Move Down").size(14.0)).clicked() {
-                        self.modified.flag(Fields::MoveDown);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
+                    for button in BUTTONS.iter() {
+                        let (label, field) = button;
+                        if ui.button(RT::new(*label).size(14.0)).clicked() {
+                            self.modified.flag(field.clone());
+                            self.state.clicks = self.state.clicks.overflowing_add(1).0;
+                        }
                     }
                 });
 
