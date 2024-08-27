@@ -71,7 +71,7 @@ impl<T: Hash> StateMonitor<T> {
     }
 
     fn update(&mut self, obj: &T) {
-        let code = StateMonitor::hash_code(obj);
+        let code = Self::hash_code(obj);
         if code != self.current_hash {
             self.current_hash = code;
             self.last_modification_time = Instant::now();

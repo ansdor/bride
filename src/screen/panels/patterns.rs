@@ -1,12 +1,28 @@
-use std::{collections::HashSet, sync::mpsc::Receiver, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::{mpsc::Receiver, LazyLock},
+    time::Duration,
+};
 
 use super::{FieldFlags, StateMonitor};
 use crate::{screen, server, utils};
 
 static CHECKBOXES: [&str; 5] = ["Mirror", "Flip", "Sine", "Random Flip", "Sync Offset"];
+static BUTTONS: LazyLock<Vec<(&'static str, Fields)>> = LazyLock::new(|| {
+    vec![
+        ("Add", Fields::Add),
+        ("Delete", Fields::Delete),
+        ("Duplicate", Fields::Duplicate),
+        ("Adjust", Fields::AdjustOne),
+        ("Adjust All", Fields::AdjustAll),
+        ("Copy Prev", Fields::CopyPrev),
+        ("Copy Next", Fields::CopyNext),
+    ]
+});
+
 const X_SCALAR: i32 = 10;
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 enum Fields {
     Select,
     Edit,
@@ -184,7 +200,8 @@ impl screen::CommandHandler for PatternsPanel {
         if cmd == "package-props" {
             self.prop_cache.clear();
             if !err && !resp.starts_with(EMPTY_SIGNAL) {
-                self.prop_cache.extend(resp.lines().map(str::trim).map(String::from));
+                self.prop_cache
+                    .extend(resp.lines().map(str::trim).map(String::from));
             }
         } else if cmd == "pattern-add" {
             self.scroll_to.replace(self.pattern_cache.len());
@@ -256,35 +273,25 @@ impl screen::StateSync for PatternsPanel {
             let (mut setter, mut sliders) = (false, false);
             for field in self.modified.drain() {
                 match field {
-                    Fields::Add => {
-                        send(&format!("pattern-add {}", section));
-                    }
-                    Fields::Delete => {
-                        send(&format!("pattern-delete {} {}", section, pattern));
-                    }
+                    Fields::Add => send(&format!("pattern-add {}", section)),
+                    Fields::Delete => send(&format!("pattern-delete {} {}", section, pattern)),
                     Fields::Duplicate => {
-                        send(&format!("pattern-duplicate {} {}", section, pattern));
+                        send(&format!("pattern-duplicate {} {}", section, pattern))
                     }
-                    Fields::AdjustOne => {
-                        send(&format!("pattern-adjust {} {}", section, pattern));
-                    }
+                    Fields::AdjustOne => send(&format!("pattern-adjust {} {}", section, pattern)),
                     Fields::AdjustAll => {
                         for (i, _) in self.pattern_cache.iter().enumerate() {
                             send(&format!("pattern-adjust {} {}", section, i));
                         }
                     }
                     Fields::CopyPrev => {
-                        send(&format!("pattern-copy-all {} {}", section, section - 1));
+                        send(&format!("pattern-copy-all {} {}", section, section - 1))
                     }
                     Fields::CopyNext => {
-                        send(&format!("pattern-copy-all {} {}", section, section + 1));
+                        send(&format!("pattern-copy-all {} {}", section, section + 1))
                     }
-                    Fields::Select => {
-                        sliders = true;
-                    }
-                    Fields::Edit => {
-                        setter = true;
-                    }
+                    Fields::Select => sliders = true,
+                    Fields::Edit => setter = true,
                 }
             }
             if setter {
@@ -308,33 +315,12 @@ impl screen::Render for PatternsPanel {
                 ui.spacing_mut().item_spacing = Vec2::from([8.0, 8.0]);
                 ui.horizontal(|ui| {
                     ui.add_space(64.0);
-                    if ui.button(RT::new("Add").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Add);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Delete").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Delete);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Duplicate").size(14.0)).clicked() {
-                        self.modified.flag(Fields::Duplicate);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Adjust").size(14.0)).clicked() {
-                        self.modified.flag(Fields::AdjustOne);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Adjust All").size(14.0)).clicked() {
-                        self.modified.flag(Fields::AdjustAll);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Copy Prev").size(14.0)).clicked() {
-                        self.modified.flag(Fields::CopyPrev);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
-                    }
-                    if ui.button(RT::new("Copy Next").size(14.0)).clicked() {
-                        self.modified.flag(Fields::CopyNext);
-                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
+                    for button in BUTTONS.iter() {
+                        let (label, flag) = button;
+                        if ui.button(RT::new(*label).size(14.0)).clicked() {
+                            self.modified.flag(flag.clone());
+                            self.state.clicks = self.state.clicks.overflowing_add(1).0;
+                        }
                     }
                 });
                 ui.horizontal(|ui| {
