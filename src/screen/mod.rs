@@ -216,22 +216,23 @@ impl eframe::App for Screen {
             ctx.set_zoom_factor(interface_scale);
             self.resize_frame_skip = true;
         }
-        egui::Window::new("bride")
-            .frame(egui::Frame::none().fill(egui::Color32::from_hex("#111218").unwrap()))
+        use egui::*;
+        Window::new("bride")
+            .frame(Frame::none().fill(Color32::from_hex("#111218").unwrap()))
             .resizable(false)
             .movable(false)
             .collapsible(false)
             .title_bar(false)
             .enabled(self.enabled)
             .show(ctx, |ui| {
-                if ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::Z)) {
+                if ui.input(|i| i.modifiers.ctrl && i.key_pressed(Key::Z)) {
                     self.queue.send(if ui.input(|i| i.modifiers.shift) {
                         "redo"
                     } else {
                         "undo"
                     });
                 }
-                ui.spacing_mut().item_spacing = egui::Vec2::from([0.0, 0.0]);
+                ui.spacing_mut().item_spacing = Vec2::from([0.0, 0.0]);
                 ui.set_width(ctx.screen_rect().width());
                 ui.set_height(ctx.screen_rect().height());
                 ui.add_space(ui.available_height() / 2.0 - rh / 2.0);
@@ -244,13 +245,13 @@ impl eframe::App for Screen {
                         ui.horizontal(|ui| {
                             ui.add_space(16.0);
                             ui.label(if self.queue.connected() {
-                                egui::RichText::new("connected")
-                                    .color(egui::Color32::GREEN)
+                                RichText::new("connected")
+                                    .color(Color32::GREEN)
                                     .strong()
                                     .size(14.0)
                             } else {
-                                egui::RichText::new("disconnected")
-                                    .color(egui::Color32::RED)
+                                RichText::new("disconnected")
+                                    .color(Color32::RED)
                                     .strong()
                                     .size(14.0)
                             });
@@ -262,6 +263,19 @@ impl eframe::App for Screen {
                         })
                     });
                 });
+                if !self.enabled {
+                    const SPINNER_SIZE: f32 = 128.0;
+                    Spinner::new().paint_at(
+                        ui,
+                        Rect::from_center_size(
+                            Pos2::from([
+                                ctx.screen_rect().width() / 2.0,
+                                ctx.screen_rect().height() / 2.0
+                            ]),
+                            Vec2::from([SPINNER_SIZE, SPINNER_SIZE])
+                        )
+                    );
+                }
             });
         ctx.request_repaint_after(Duration::from_millis(16));
     }

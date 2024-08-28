@@ -1,5 +1,8 @@
 use std::{
-    cmp, collections::HashSet, sync::{mpsc::Sender, LazyLock}, time::Duration
+    cmp,
+    collections::HashSet,
+    sync::{mpsc::Sender, LazyLock},
+    time::Duration,
 };
 
 use super::{FieldFlags, StateMonitor};
@@ -251,8 +254,7 @@ impl screen::StateSync for SectionsPanel {
 
     fn write_state(&mut self, send: &mut dyn FnMut(&str)) {
         if self.monitor.time_elapsed(Duration::from_millis(80)) {
-            let mut request = false;
-            let mut sliders = false;
+            let (mut request, mut sliders, mut view) = (false, false, false);
             let s = &self.state.selected;
             for field in self.modified.drain() {
                 request = true;
@@ -270,19 +272,7 @@ impl screen::StateSync for SectionsPanel {
                         let _ = self.last_move.replace(1);
                     }
                     Fields::View => {
-                        let view_z: i32 = self
-                            .cache
-                            .iter()
-                            .map(|x| {
-                                if let Some(d) = Self::extract_section_data(&x.0) {
-                                    d.0
-                                } else {
-                                    0
-                                }
-                            })
-                            .take(self.state.selected)
-                            .sum();
-                        send(&format!("view-position 0 {}", view_z));
+                        view = true;
                     }
                     Fields::Edit => {
                         let s = &self.state;
@@ -299,6 +289,22 @@ impl screen::StateSync for SectionsPanel {
             }
             if sliders {
                 self.update_sliders();
+            }
+            if view {
+                send(&format!(
+                    "view-position 0 {}",
+                    self.cache
+                        .iter()
+                        .map(|x| {
+                            if let Some(d) = Self::extract_section_data(&x.0) {
+                                d.0
+                            } else {
+                                0
+                            }
+                        })
+                        .take(self.state.selected)
+                        .sum::<i32>()
+                ))
             }
             if request {
                 send("section-list");
@@ -357,7 +363,7 @@ impl screen::Render for SectionsPanel {
 
                 ui.horizontal(|ui| {
                     ui.add_space(32.0);
-                    ui.checkbox(&mut self.sync_view, "Synchronize Preview");
+                    ui.checkbox(&mut self.sync_view, "Auto Select From View");
                     ui.add_space(96.0);
                     ui.spacing_mut().item_spacing = Vec2::from([8.0, 4.0]);
                     for button in BUTTONS.iter() {
