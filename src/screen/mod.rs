@@ -197,6 +197,14 @@ impl Screen {
 }
 
 impl eframe::App for Screen {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        let queue = mem::replace(&mut self.queue, CommandQueue::new());
+        match queue.disconnect() {
+            Err(e) => eprintln!("{:?}", e),
+            _ => {}
+        }
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if let Err(msg) = self.global_update() {
             eprintln!("{msg}");
