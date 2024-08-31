@@ -199,7 +199,7 @@ impl screen::CommandHandler for SectionsPanel {
                         .replace(self.state.selected.saturating_add_signed(d));
                 }
             } else if cmd == "view-position" && self.sync_view {
-                if let Some(coords) = args.split_once(' ') {
+                if let Some(coords) = args.split_once(char::is_whitespace) {
                     if let Ok(mut view_z) = coords.1.parse::<i32>() {
                         let mut target_section = 0;
                         for section in &self.cache {

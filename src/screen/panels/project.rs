@@ -199,7 +199,6 @@ impl screen::Render for ProjectPanel {
                 ui.set_height(32.0);
                 ui.set_width(640.0 - 24.0);
                 ui.horizontal_centered(|ui| {
-                    let char_limit = 28;
                     let project_name = match &self.project_file_name {
                         Some(name) => name,
                         None => "<unsaved>",
@@ -207,13 +206,9 @@ impl screen::Render for ProjectPanel {
                     ui.add_sized(
                         [ui.available_width() / 3.0, 32.0],
                         Label::new(
-                            RT::new(if project_name.len() > char_limit {
-                                &project_name[0..char_limit]
-                            } else {
-                                project_name
-                            })
-                            .size(20.0),
-                        ),
+                            RT::new(project_name)
+                            .size(18.0),
+                        ).truncate(true),
                     );
                     let new_button = Button::new(RT::new("New Track").size(14.0));
                     if ui.add_sized([64.0, 32.0], new_button).clicked() {

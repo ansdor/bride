@@ -199,9 +199,8 @@ impl Screen {
 impl eframe::App for Screen {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let queue = mem::replace(&mut self.queue, CommandQueue::new());
-        match queue.disconnect() {
-            Err(e) => eprintln!("{:?}", e),
-            _ => {}
+        if let Err(e) = queue.disconnect() {
+            eprintln!("{:?}", e);
         }
     }
 

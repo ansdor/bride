@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, net::SocketAddr};
+use std::{
+    collections::VecDeque,
+    net::SocketAddr,
+};
 
 use super::ServerHandle;
 use crate::utils::UnitResult;
@@ -47,16 +50,34 @@ impl Response {
 }
 
 #[derive(Debug)]
-pub enum ClientState {
-    Disconnected,
-    WaitingForResponse,
-    WaitingForRetrieval,
-    Processing,
-    Idle,
+struct Command {
+    command: String,
+    args: Vec<String>,
 }
 
-impl Default for ClientState {
-    fn default() -> Self { Self::Disconnected }
+impl From<&str> for Command {
+    fn from(value: &str) -> Self { Command::from(String::from(value)) }
+}
+
+impl From<Command> for String {
+    fn from(value: Command) -> Self {
+        let mut s = String::new();
+        s.push_str(&value.command);
+        value.args.iter().for_each(|x| {
+            s.push(' ');
+            s.push_str(x);
+        });
+        s
+    }
+}
+
+impl From<String> for Command {
+    fn from(value: String) -> Self {
+        let parts: Vec<&str> = value.split(' ').collect();
+        let command = String::from(parts[0]);
+        let args = parts.into_iter().skip(1).map(String::from).collect();
+        Command { command, args }
+    }
 }
 
 #[derive(Debug)]
@@ -77,9 +98,8 @@ impl Default for ServerState {
 pub struct CommandQueue {
     server_state: ServerState,
     server: Option<ServerHandle>,
-    commands: VecDeque<String>,
-    waiting: Option<String>,
-    response: Option<Response>,
+    commands: VecDeque<Command>,
+    responses: VecDeque<Response>,
 }
 
 impl CommandQueue {
@@ -113,37 +133,20 @@ impl CommandQueue {
 
     pub fn send(&mut self, command: &str) {
         if !matches!(self.server_state, ServerState::Paused) {
-            self.commands.push_back(String::from(command.trim()));
+            self.commands.push_back(Command::from(command));
         }
     }
 
-    pub fn receive(&mut self) -> Option<Response> { self.response.take() }
+    pub fn receive(&mut self) -> Option<Response> { self.responses.pop_front() }
 
-    pub fn internal_state(&self) -> ClientState {
-        if !self.connected() {
-            ClientState::Disconnected
-        } else if self.waiting.is_some() && self.response.is_none() {
-            ClientState::WaitingForResponse
-        } else if self.waiting.is_none() && self.response.is_some() {
-            ClientState::WaitingForRetrieval
-        } else if !self.commands.is_empty() {
-            ClientState::Processing
-        } else {
-            ClientState::Idle
+    fn update_server_state(message: &str) -> Option<ServerState> {
+        match message {
+            x if x.starts_with("<READY>") => Some(ServerState::Ready),
+            x if x.starts_with("<PAUSE>") => Some(ServerState::Paused),
+            x if x.starts_with("<EXIT>") => Some(ServerState::Finished),
+            x if x.starts_with("monster>") => Some(ServerState::Prompt),
+            _ => None,
         }
-    }
-
-    fn update_server_state(&mut self, message: &str) -> UnitResult {
-        self.server_state = match message {
-            x if x.starts_with("<READY>") => ServerState::Ready,
-            x if x.starts_with("<PAUSE>") => ServerState::Paused,
-            x if x.starts_with("<EXIT>") => ServerState::Finished,
-            x if x.starts_with("monster>") => ServerState::Prompt,
-            _ => {
-                return Err("Unrecognized".into());
-            }
-        };
-        Ok(())
     }
 
     pub fn connected(&self) -> bool {
@@ -155,70 +158,34 @@ impl CommandQueue {
 
     pub fn paused(&self) -> bool { matches!(self.server_state, ServerState::Paused) }
 
-    pub fn prompt(&self) -> bool {
-        matches!(
-            (&self.server_state, self.internal_state()),
-            (ServerState::Prompt, ClientState::Idle)
-        )
-    }
+    pub fn prompt(&self) -> bool { matches!(&self.server_state, ServerState::Prompt) }
 
     pub fn finished(&self) -> bool { matches!(self.server_state, ServerState::Finished) }
 
     pub fn update(&mut self) -> UnitResult {
         if let Some(server) = &mut self.server {
             server.update()?;
-        }
-        match self.internal_state() {
-            //if it's disconnected, there's nothing to do
-            ClientState::Disconnected => Ok(()),
-            //if it's waiting for response, try to get it
-            ClientState::WaitingForResponse => {
-                //the server is guaranteed to exist and be connected
-                if let Some(server) = &mut self.server {
-                    if let Some(response) = server.receive() {
-                        let analysis = Self::analyze_response(&response);
-                        if matches!(analysis, Response::Nothing) {
-                            if self.update_server_state(&response).is_err() {
-                                return Err(format!(
-                                    "Unrecognized message from server: {}",
-                                    response
-                                )
-                                .into());
-                            }
+            if server.connected {
+                while let Some(response) = server.receive() {
+                    let analysis = Self::analyze_response(&response);
+                    if matches!(analysis, Response::Nothing) {
+                        if let Some(state) = Self::update_server_state(&response) {
+                            self.server_state = state;
                         } else {
-                            self.response.replace(analysis);
-                            self.waiting.take();
+                            return Err(
+                                format!("Unrecognized message from server: {}", response).into()
+                            );
                         }
+                    } else {
+                        self.responses.push_back(analysis);
                     }
                 }
-                Ok(())
-            }
-            //the response to the last command is on queue,
-            //waiting to be picked up from somewhere else
-            ClientState::WaitingForRetrieval | ClientState::Idle => {
-                if !self.prompt() {
-                    if let Some(server) = &mut self.server {
-                        if let Some(msg) = server.receive() {
-                            if self.update_server_state(&msg).is_err() {
-                                return Err(
-                                    format!("Unrecognized message from server: {}", msg).into()
-                                );
-                            }
-                        }
-                    }
+                while let Some(command) = self.commands.pop_front() {
+                    server.send(&String::from(command))?;
                 }
-                Ok(())
-            }
-            //there are commands ready to be sent to the server
-            ClientState::Processing => {
-                if let Some(server) = &mut self.server {
-                    let command = self.commands.pop_front().unwrap();
-                    server.send(&command)?;
-                    self.waiting.replace(command);
-                }
-                Ok(())
             }
         }
+        Ok(())
     }
 
     fn analyze_response(response: &str) -> Response {

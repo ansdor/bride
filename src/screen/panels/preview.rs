@@ -53,13 +53,32 @@ impl screen::CommandHandler for PreviewPanel {
     fn handle(&mut self, contents: &server::Response) -> utils::UnitResult {
         let (err, cmd, args, resp) = contents.decompose();
         if !err {
-            if cmd == "view-position" {
-                if let Some(coords) = args.split_once(' ') {
-                    let (x, z) = (coords.0.parse::<i32>(), coords.1.parse::<i32>());
-                    if let (Ok(x), Ok(z)) = (x, z) {
-                        self.state.view_x = x / 10;
-                        self.state.view_z = z / 10;
+            if cmd == "view-state-info" {
+                for line in resp.lines().map(str::trim) {
+                    if let Some((field, val)) = line.split_once(char::is_whitespace) {
+                        match field {
+                            "position" => {
+                                let coords = val
+                                    .split_once(char::is_whitespace)
+                                    .map(|(x, z)| (x.parse::<i32>(), z.parse::<i32>()));
+                                if let Some((Ok(x), Ok(z))) = coords {
+                                    self.state.view_x = x / SLIDER_SCALE;
+                                    self.state.view_z = z / SLIDER_SCALE;
+                                }
+                            }
+                            "reverse" => self.state.reverse = val.starts_with("#t"),
+                            "overview" => self.state.overview = val.starts_with("#t"),
+                            _ => {}
+                        }
                     }
+                }
+            } else if cmd == "view-position" {
+                let coords = args
+                    .split_once(char::is_whitespace)
+                    .map(|(x, z)| (x.parse::<i32>(), z.parse::<i32>()));
+                if let Some((Ok(x), Ok(z))) = coords {
+                    self.state.view_x = x / SLIDER_SCALE;
+                    self.state.view_z = z / SLIDER_SCALE;
                 }
             } else if cmd == "view-preview" && self.image_data.is_none() {
                 let mut image_data = Vec::with_capacity(8192);
@@ -73,19 +92,19 @@ impl screen::CommandHandler for PreviewPanel {
 
 impl screen::StateSync for PreviewPanel {
     fn initialize_state(&mut self, send: &mut dyn FnMut(&str)) {
-        self.commands.extend(vec!["view-preview", "view-position"]);
+        self.commands
+            .extend(vec!["view-preview", "view-position", "view-state-info"]);
         let (w, h) = (PREVIEW_SIZE[0] as u32, PREVIEW_SIZE[1] as u32);
         send(format!("view-preview-size {} {}", w, h).as_str());
-        send("view-position 0 0");
-        send("view-overview #f");
-        send("track-reverse #f");
+        send("view-state-info");
     }
 
-    fn update_state(&mut self) {
-        self.monitor.update(&self.state);
-    }
+    fn update_state(&mut self) { self.monitor.update(&self.state); }
 
-    fn request_state(&self, send: &mut dyn FnMut(&str)) { send("view-preview"); }
+    fn request_state(&self, send: &mut dyn FnMut(&str)) {
+        send("view-preview");
+        send("view-state-info");
+    }
 
     fn write_state(&mut self, send: &mut dyn FnMut(&str)) {
         let t = Duration::from_millis(CHANGE_PREVIEW_TIME);
