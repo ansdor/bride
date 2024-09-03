@@ -303,7 +303,7 @@ impl screen::StateSync for SectionsPanel {
                             }
                         })
                         .take(self.state.selected)
-                        .sum::<i32>()
+                        .sum::<i32>() + 1
                 ))
             }
             if request {
@@ -363,7 +363,12 @@ impl screen::Render for SectionsPanel {
 
                 ui.horizontal(|ui| {
                     ui.add_space(32.0);
+                    let sync_view = self.sync_view;
                     ui.checkbox(&mut self.sync_view, "Auto Select From View");
+                    if !sync_view && self.sync_view != sync_view {
+                        self.modified.flag(Fields::View);
+                        self.state.clicks = self.state.clicks.overflowing_add(1).0;
+                    }
                     ui.add_space(96.0);
                     ui.spacing_mut().item_spacing = Vec2::from([8.0, 4.0]);
                     for button in BUTTONS.iter() {

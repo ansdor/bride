@@ -106,9 +106,10 @@ impl screen::StateSync for ConsolePanel {
         self.normal_excludes = HashSet::from_iter(vec![
             "view-position",
             "view-overview",
+            "view-preview-size",
+            "view-state-info",
             "track-reverse",
             "color-list",
-            "view-preview-size",
             "package-list",
             "package-backgrounds",
             "package-textures",
@@ -119,6 +120,7 @@ impl screen::StateSync for ConsolePanel {
             "project-list",
             "project-file-name",
             "pattern-list"
+
         ]);
     }
 
